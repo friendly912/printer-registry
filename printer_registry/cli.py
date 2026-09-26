@@ -13,20 +13,13 @@ from __future__ import annotations
 import argparse
 import hashlib
 import sys
-from pathlib import Path
 
 from . import crypto, db
+from .config import DATA_DIR, ISSUER_ID, LOCAL_DB_PATH, MOCK_NVRAM_PATH, PRIVATE_KEY_PATH, PUBLIC_KEY_PATH
 from .judge import verify_printer
 from .pjl_usb_backend import PJLUSBBackend
 from .printer_iface import MockPrinterBackend, PrinterBackend
 from .token import issue_token
-
-DATA_DIR = Path(__file__).resolve().parent.parent / "data"
-PRIVATE_KEY_PATH = DATA_DIR / "registration_private.pem"
-PUBLIC_KEY_PATH = DATA_DIR / "registration_public.pem"
-LOCAL_DB_PATH = DATA_DIR / "terminal.sqlite3"
-MOCK_NVRAM_PATH = DATA_DIR / "mock_printer_nvram.json"
-ISSUER_ID = "poc-registration-terminal-01"
 
 
 def _hash_device_ref(device_ref: str) -> str:

@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>印刷機を登録</h1>
+<form method="post">
+  <label>デバイス参照(モックなら任意の文字列、実機なら /dev/usb/lp0 等)</label>
+  <input type="text" name="device_ref" placeholder="usb:001" required>
+
+  <label>機種</label>
+  <input type="text" name="model" placeholder="Canon X1">
+
+  <label>設置場所</label>
+  <input type="text" name="location" placeholder="本社3F">
+
+  <label>バックエンド</label>
+  <select name="backend">
+    <option value="mock">mock(モック / 実機なし)</option>
+    <option value="pjl-usb">pjl-usb(実機・未検証)</option>
+  </select>
+
+  <button type="submit">登録する</button>
+</form>
+{% endblock %}

@@ -42,6 +42,21 @@ python -m printer_registry.cli verify --device-ref usb:001
 python -m printer_registry.cli show-log
 ```
 
+## Web UI(登録・照合端末の画面)
+
+CLIと同じロジック(crypto/db/judge)を呼ぶだけの表示層。ローカルのブラウザ
+からダッシュボード・登録・照合を操作できる。ネットワークに公開する用途
+ではなく、端末自身の127.0.0.1での利用を想定。
+
+```bash
+python -m printer_registry.webui
+# ブラウザで http://127.0.0.1:5000/ を開く
+```
+
+- `/` … 登録済み印刷機の一覧、直近ログ、ログのハッシュチェーン健全性
+- `/register` … デバイス参照・機種・設置場所・バックエンド(mock/pjl-usb)を指定して登録
+- `/verify` … デバイス参照とバックエンドを指定して照合し、3値判定を色分け表示
+
 ## テスト
 
 ```bash

@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>印刷機を照合</h1>
+<form method="post">
+  <label>デバイス参照</label>
+  <input type="text" name="device_ref" placeholder="usb:001" value="{{ device_ref or '' }}" required>
+
+  <label>バックエンド</label>
+  <select name="backend">
+    <option value="mock">mock(モック / 実機なし)</option>
+    <option value="pjl-usb">pjl-usb(実機・未検証)</option>
+  </select>
+
+  <button type="submit">照合する</button>
+</form>
+
+{% if result %}
+<div class="result-box">
+  <p class="muted">device_ref = {{ device_ref }}</p>
+  <p><span class="badge badge-{{ result }}">{{ result }}</span></p>
+  <p>{{ detail }}</p>
+</div>
+{% endif %}
+{% endblock %}
