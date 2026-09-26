@@ -14,9 +14,36 @@ PJL-over-USB / SNMP / EWS API を使う実アダプタに差し替えられる�
 
 ## セットアップ
 
+### 通常(インターネット接続あり)
+
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
+```
+
+### オフライン環境(インターネット接続なし)
+
+`wheelhouse/` ディレクトリに必要なパッケージ一式(cryptography, flask とその
+依存パッケージ)を wheel ファイルとして同梱済み。USBメモリ等でこのリポジトリ
+ごとオフライン環境にコピーし、以下のように `--no-index` でインストールする。
+
+```bash
+python3 -m venv .venv && source .venv/bin/activate
+pip install --no-index --find-links=wheelhouse -r requirements.txt
+```
+
+**重要な前提条件**：`wheelhouse/` の wheel はこの開発環境
+(Linux x86_64 / Python 3.12 / glibc 2.34以降)向けにビルドされたバイナリ。
+オフライン環境のOS・アーキテクチャ・Pythonバージョンが異なる場合は使えない
+ため、事前に `python3 --version` と `uname -m` を確認すること。異なる場合は、
+インターネットに接続できる環境かつ対象環境と同じ条件(同じPythonバージョン
+のマシン、または `pip download --platform ... --python-version ... --abi ...
+--only-binary=:all:` でクロスプラットフォーム指定)で `wheelhouse/` を作り
+直す必要がある。
+
+```bash
+# wheelhouse の作り直し方(オンライン環境で実行)
+pip download -r requirements.txt -d wheelhouse --only-binary=:all:
 ```
 
 ## 使い方
