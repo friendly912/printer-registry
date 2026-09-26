@@ -48,10 +48,29 @@ python -m printer_registry.cli show-log
 python -m unittest tests/test_flow.py -v
 ```
 
-## 実運用に置き換える際の変更点
+## 実機アダプタ(PJL over USB)
 
-- `printer_registry/printer_iface.py` … `MockPrinterBackend` を実機アダプタ
-  (メーカー別のPJLコマンド/EWS API実装)に差し替える
+`printer_registry/pjl_usb_backend.py` に、USBプリンタのデバイスファイル
+(例: Linuxの `/dev/usb/lp0`)へ生のPJLコマンドを送受信する `PJLUSBBackend`
+を実装済み。`@PJL DEFAULT <var>="<value>"` でNVRAMへの永続化、
+`@PJL DINQUIRE <var>` で読み戻しを行う、汎用ベースラインの実装。
+
+実機がまだ無いため、プロトコルのエンコード/デコード(`pjl_protocol.py`)は
+ソケットペア上の擬似プリンタ(`tests/test_pjl_backend.py`)でバイト列レベル
+まで検証済みだが、**実プリンタでの動作は未検証**。ベンダーによって
+`@PJL DEFAULT` の代わりに `@PJL SET` が必要だったり、応答フォーマットが
+異なったりするため、実機接続後にまずこの1点を確認する必要がある。
+
+```bash
+# 実機(/dev/usb/lp0)に対して実行する場合
+python -m printer_registry.cli register --backend pjl-usb --device-ref /dev/usb/lp0 --model "Canon X1" --location "本社3F"
+python -m printer_registry.cli verify --backend pjl-usb --device-ref /dev/usb/lp0
+```
+
+## 実運用に置き換える際の残りの変更点
+
 - `printer_registry/crypto.py` … 秘密鍵の読み書きをTPM/USBセキュリティキー
   呼び出しに置き換える(秘密鍵をファイルとして扱わない)
 - `printer_registry/db.py` … SQLite接続をSQLCipher(暗号化)に切り替える
+- `pjl_usb_backend.py` … 実機検証後、ベンダーごとにコマンド体系の差分を
+  吸収するサブクラス/プラグインに分岐させる

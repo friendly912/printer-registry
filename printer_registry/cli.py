@@ -17,7 +17,8 @@ from pathlib import Path
 
 from . import crypto, db
 from .judge import verify_printer
-from .printer_iface import MockPrinterBackend
+from .pjl_usb_backend import PJLUSBBackend
+from .printer_iface import MockPrinterBackend, PrinterBackend
 from .token import issue_token
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
@@ -33,6 +34,23 @@ def _hash_device_ref(device_ref: str) -> str:
     return hashlib.sha256(device_ref.encode("utf-8")).hexdigest()[:16]
 
 
+def _make_backend(args: argparse.Namespace) -> PrinterBackend:
+    if args.backend == "pjl-usb":
+        # --device-ref is then a real path, e.g. /dev/usb/lp0
+        return PJLUSBBackend()
+    return MockPrinterBackend(MOCK_NVRAM_PATH)
+
+
+def _add_backend_flag(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--backend",
+        choices=["mock", "pjl-usb"],
+        default="mock",
+        help="mock: simulated NVRAM (default). pjl-usb: real device over "
+             "--device-ref as a USB printer device path (untested against actual hardware).",
+    )
+
+
 def cmd_init_keys(_args: argparse.Namespace) -> None:
     DATA_DIR.mkdir(exist_ok=True)
     if PRIVATE_KEY_PATH.exists():
@@ -46,7 +64,7 @@ def cmd_register(args: argparse.Namespace) -> None:
     DATA_DIR.mkdir(exist_ok=True)
     private_key = crypto.load_private_key(PRIVATE_KEY_PATH)
     conn = db.connect(LOCAL_DB_PATH)
-    backend = MockPrinterBackend(MOCK_NVRAM_PATH)
+    backend = _make_backend(args)
 
     printer_id = _hash_device_ref(args.device_ref)
     tok = issue_token(printer_id=printer_id, issuer_id=ISSUER_ID, private_key=private_key)
@@ -66,7 +84,7 @@ def cmd_register(args: argparse.Namespace) -> None:
 def cmd_verify(args: argparse.Namespace) -> None:
     public_key = crypto.load_public_key(PUBLIC_KEY_PATH)
     conn = db.connect(LOCAL_DB_PATH)
-    backend = MockPrinterBackend(MOCK_NVRAM_PATH)
+    backend = _make_backend(args)
 
     result, detail = verify_printer(backend, args.device_ref, public_key, conn)
     print(f"device_ref={args.device_ref} -> {result.value}")
@@ -110,10 +128,12 @@ def main(argv: list[str] | None = None) -> int:
     p_register.add_argument("--device-ref", required=True, help="stand-in for USB device path / serial")
     p_register.add_argument("--model", default="unknown")
     p_register.add_argument("--location", default="unknown")
+    _add_backend_flag(p_register)
     p_register.set_defaults(func=cmd_register)
 
     p_verify = sub.add_parser("verify")
     p_verify.add_argument("--device-ref", required=True)
+    _add_backend_flag(p_verify)
     p_verify.set_defaults(func=cmd_verify)
 
     p_tamper = sub.add_parser("tamper")
