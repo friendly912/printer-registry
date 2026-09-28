@@ -90,6 +90,29 @@ python -m printer_registry.webui
 python -m unittest tests/test_flow.py -v
 ```
 
+## 一括登録(複数台を1回のコマンドで登録)
+
+USB接続は1台ずつ物理的に繋ぐ手間があるため、複数台をまとめて処理する
+`batch-register` を用意している。対象デバイスは「今すでに有効なトークンを
+持っているか」を先に照合してから登録するので、二重登録にならず、複数回
+実行しても安全(冪等)。改ざんが疑われる機体(`tamper_suspected`)は自動登録
+の対象から外れ、`needs_review` として報告されるだけで上書きされない。
+
+```bash
+# mockバックエンド: デバイス参照を明示指定
+python -m printer_registry.cli batch-register \
+  --device-refs "usb:001,usb:002,usb:003" \
+  --metadata-csv devices.csv \
+  --default-model "unknown" --default-location "未設定"
+
+# pjl-usbバックエンド: /dev/usb/lp* をglobで自動検出
+python -m printer_registry.cli batch-register \
+  --backend pjl-usb --glob "/dev/usb/lp*" --metadata-csv devices.csv
+```
+
+`devices.csv` は `device_ref,model,location` の列を持つCSV。記載のない
+デバイスは `--default-model` / `--default-location` にフォールバックする。
+
 ## 実機アダプタ(PJL over USB)
 
 `printer_registry/pjl_usb_backend.py` に、USBプリンタのデバイスファイル

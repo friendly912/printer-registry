@@ -7,14 +7,17 @@ Usage:
     python -m printer_registry.cli verify --device-ref usb:0001
     python -m printer_registry.cli tamper --device-ref usb:0001     # demo: corrupt a stored token
     python -m printer_registry.cli show-log
+    python -m printer_registry.cli batch-register --backend pjl-usb --glob "/dev/usb/lp*" --metadata-csv devices.csv
 """
 from __future__ import annotations
 
 import argparse
 import hashlib
 import sys
+from pathlib import Path
 
 from . import crypto, db
+from .batch_register import discover_devices, load_metadata_csv, register_batch
 from .config import DATA_DIR, ISSUER_ID, LOCAL_DB_PATH, MOCK_NVRAM_PATH, PRIVATE_KEY_PATH, PUBLIC_KEY_PATH
 from .judge import verify_printer
 from .pjl_usb_backend import PJLUSBBackend
@@ -99,6 +102,50 @@ def cmd_tamper(args: argparse.Namespace) -> None:
     print(f"tampered token for device_ref={args.device_ref}")
 
 
+def cmd_batch_register(args: argparse.Namespace) -> None:
+    DATA_DIR.mkdir(exist_ok=True)
+    if not PRIVATE_KEY_PATH.exists():
+        print("鍵が見つかりません。先に `init-keys` を実行してください")
+        return
+
+    private_key = crypto.load_private_key(PRIVATE_KEY_PATH)
+    public_key = crypto.load_public_key(PUBLIC_KEY_PATH)
+    conn = db.connect(LOCAL_DB_PATH)
+
+    if args.device_refs:
+        device_refs = [d.strip() for d in args.device_refs.split(",") if d.strip()]
+    elif args.backend == "pjl-usb":
+        device_refs = discover_devices(args.glob)
+    else:
+        print("mockバックエンドでは --device-refs で対象デバイスを指定してください"
+              "(例: --device-refs usb:001,usb:002)")
+        return
+
+    if not device_refs:
+        print(f"対象デバイスが見つかりませんでした(pattern={args.glob!r})")
+        return
+
+    metadata = load_metadata_csv(Path(args.metadata_csv)) if args.metadata_csv else {}
+
+    def backend_factory() -> PrinterBackend:
+        return _make_backend(args)
+
+    results = register_batch(
+        device_refs, metadata, args.default_model, args.default_location,
+        private_key, public_key, conn, backend_factory, ISSUER_ID,
+    )
+
+    counts: dict[str, int] = {}
+    for r in results:
+        counts[r.outcome.value] = counts.get(r.outcome.value, 0) + 1
+
+    print(f"{len(results)}台を処理しました  "
+          + "  ".join(f"{k}={v}" for k, v in counts.items()))
+    for r in results:
+        pid = f" printer_id={r.printer_id}" if r.printer_id else ""
+        print(f"  {r.device_ref:24s} -> {r.outcome.value:20s}{pid}  {r.detail}")
+
+
 def cmd_show_log(_args: argparse.Namespace) -> None:
     conn = db.connect(LOCAL_DB_PATH)
     chain_ok = db.verify_log_chain(conn)
@@ -134,6 +181,19 @@ def main(argv: list[str] | None = None) -> int:
     p_tamper.set_defaults(func=cmd_tamper)
 
     sub.add_parser("show-log").set_defaults(func=cmd_show_log)
+
+    p_batch = sub.add_parser("batch-register")
+    p_batch.add_argument("--glob", default="/dev/usb/lp*",
+                          help="pjl-usbバックエンドでの自動検出パターン(未指定時のデフォルト)")
+    p_batch.add_argument("--device-refs",
+                          help="カンマ区切りのデバイス参照。指定時はglob検出より優先("
+                               "mockバックエンドでは必須)")
+    p_batch.add_argument("--metadata-csv",
+                          help="device_ref,model,location の列を持つCSV(未指定の機体は--default-*を使用)")
+    p_batch.add_argument("--default-model", default="unknown")
+    p_batch.add_argument("--default-location", default="unknown")
+    _add_backend_flag(p_batch)
+    p_batch.set_defaults(func=cmd_batch_register)
 
     args = parser.parse_args(argv)
     args.func(args)
